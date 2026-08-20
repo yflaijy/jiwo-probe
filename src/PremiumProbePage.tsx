@@ -10,11 +10,13 @@ import {
   Globe2,
   Gauge,
   Layers,
+  Moon,
   Palette,
   Radio,
   Server,
   ShieldCheck,
   Sparkles,
+  SunMoon,
   Target,
   X,
   XCircle,
@@ -25,10 +27,16 @@ import type {
   ProbePayload,
 } from './types'
 import { Twemoji } from './Twemoji'
-import { setDarkOverride } from './use-probe'
+import { parseThemeName } from './use-probe'
 import { EXTRA_LICENSE_BADGES, HEADER_LICENSE_BADGES } from './license-badges'
 import { FLAG_OPTIONS } from './country-flag'
 import { displayServerName } from './server-name'
+import {
+  dailyTrafficRows,
+  hasTrafficPeriod,
+  trafficRuleLabel,
+  type TrafficRange,
+} from './traffic-display'
 import { BlackGoldGlobe, type PremiumProbeRegion } from './BlackGoldGlobe'
 import './premium-probe.css'
 
@@ -38,7 +46,7 @@ function cn(...values: Array<string | false | null | undefined>): string {
   return values.filter(Boolean).join(' ')
 }
 
-const LICENSE_CYCLE_MS = 5500
+const LICENSE_CYCLE_MS = 5596 // 主控 license-nameplate 实测周期(2026-08-17)
 const LICENSE_REVEAL_END = 0.36
 const licenseStarPalette = ['#8c5d17', '#d7a63d', '#f2d78a', '#fff1b9', '#c78e24']
 const licenseClamp = (value: number, min: number, max: number) =>
@@ -1921,8 +1929,8 @@ function PremiumServerCard({
   const mem = resourcePercentage(server.mem_used, server.mem_total)
   const disk = resourcePercentage(server.disk_used, server.disk_total)
   const trafficUsed =
-    server.traffic_used_total ??
     server.traffic_used ??
+    server.traffic_used_total ??
     server.traffic_used_up ??
     0
   const trafficValue = server.traffic_limit
@@ -2059,8 +2067,65 @@ function ServerDetailDrawer({
   const mem = resourcePercentage(server.mem_used, server.mem_total)
   const disk = resourcePercentage(server.disk_used, server.disk_total)
   const latency = averageLatency(server)
-  const traffic = summarizeSevenDayTraffic([server])
+  // 原始上下行日流量: 周期/最近7日切换(照上游 6221dd1 + 主控 drawer)
+  const hasDailyPeriod = hasTrafficPeriod(server)
+  const [trafficRange, setTrafficRange] = useState<TrafficRange>(() =>
+    hasDailyPeriod ? 'period' : 'recent7',
+  )
+  // 总流量/上行/下行 行切换(照二级详情页 traffic-line-toggle)
+  const [trafficLines, setTrafficLines] = useState<Set<'total' | 'uplink' | 'downlink'>>(
+    () => new Set(['total', 'uplink', 'downlink']),
+  )
+  const toggleTrafficLine = (key: 'total' | 'uplink' | 'downlink') => {
+    setTrafficLines((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+  const traffic = dailyTrafficRows(server, trafficRange).map((item) => ({
+    ...item,
+    total: item.total || item.uplink + item.downlink,
+  }))
   const maxTraffic = Math.max(1, ...traffic.map((item) => item.total))
+  // 流量计费口径(照主控 premium drawer: 本周期计费用量/原始周期/校准调整/对账/周期/开机网卡)
+  const accounting =
+    server.traffic_used === undefined
+      ? null
+      : {
+          used: formatTrafficCompact(server.traffic_used),
+          meter: trafficRuleLabel(server),
+          rawUp: formatTrafficCompact(server.traffic_used_up ?? 0),
+          rawDown: formatTrafficCompact(server.traffic_used_down ?? 0),
+          hasRaw:
+            server.traffic_used_up !== undefined ||
+            server.traffic_used_down !== undefined,
+          adj:
+            server.traffic_adjustment === undefined
+              ? null
+              : `${server.traffic_adjustment < 0 ? '−' : '+'}${formatTrafficCompact(Math.abs(server.traffic_adjustment))}`,
+          recon:
+            server.traffic_used_total !== undefined &&
+            server.traffic_adjustment !== undefined
+              ? `${formatTrafficCompact(server.traffic_used_total)} ${
+                  server.traffic_adjustment < 0 ? '−' : '+'
+                } ${formatTrafficCompact(Math.abs(server.traffic_adjustment))} = ${formatTrafficCompact(server.traffic_used)}`
+              : null,
+          period:
+            server.period_start && server.period_end
+              ? `${server.period_start.slice(5)} — ${server.period_end.slice(5)}`
+              : null,
+          boot:
+            (server.boot_traffic_up !== undefined ||
+              server.boot_traffic_down !== undefined) &&
+            server.boot_traffic_scope !== 'all_time'
+              ? {
+                  up: formatTrafficCompact(server.boot_traffic_up ?? 0),
+                  down: formatTrafficCompact(server.boot_traffic_down ?? 0),
+                }
+              : null,
+        }
   useEffect(() => {
     const close = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
     window.addEventListener('keydown', close)
@@ -2111,23 +2176,109 @@ function ServerDetailDrawer({
             <strong>{latency === undefined ? '—' : `${latency} ms`}</strong>
           </div>
         </div>
-        <section className='premium-probe-drawer-section'>
-          <h3>近 7 日流量</h3>
-          <div className='premium-probe-drawer-traffic'>
-            {traffic.map((item) => (
-              <div key={item.date}>
-                <span>{item.date.slice(5)}</span>
-                <i>
-                  <b
-                    style={{ width: `${(item.downlink / maxTraffic) * 100}%` }}
-                  />
-                  <b
-                    style={{ width: `${(item.uplink / maxTraffic) * 100}%` }}
-                  />
-                </i>
-                <strong>{formatTrafficCompact(item.total)}</strong>
+        {accounting && (
+          <section className='premium-probe-drawer-section'>
+            <h3>流量计费口径</h3>
+            <div className='premium-probe-drawer-accounting'>
+              <div>
+                <span>本周期计费用量</span>
+                <strong>{accounting.used}</strong>
               </div>
+              {accounting.meter && <p>计费口径：{accounting.meter}</p>}
+              {accounting.hasRaw && (
+                <p>
+                  原始周期：↑ {accounting.rawUp} · ↓ {accounting.rawDown}
+                </p>
+              )}
+              {accounting.adj && <p>校准/周期边界调整：{accounting.adj}</p>}
+              {accounting.recon && <p>对账：{accounting.recon}</p>}
+              {accounting.period && <p>周期：{accounting.period}</p>}
+              {accounting.boot && (
+                <p>
+                  本次开机网卡：↑ {accounting.boot.up} · ↓ {accounting.boot.down}
+                </p>
+              )}
+            </div>
+          </section>
+        )}
+        <section className='premium-probe-drawer-section'>
+          <div className='premium-probe-traffic-heading'>
+            <h3>原始上下行日流量</h3>
+            <div role='group' aria-label='趋势范围'>
+              {hasDailyPeriod && (
+                <button
+                  type='button'
+                  className={trafficRange === 'period' ? 'is-active' : ''}
+                  onClick={() => setTrafficRange('period')}
+                >
+                  当前周期
+                </button>
+              )}
+              <button
+                type='button'
+                className={trafficRange === 'recent7' ? 'is-active' : ''}
+                onClick={() => setTrafficRange('recent7')}
+              >
+                最近 7 日
+              </button>
+            </div>
+          </div>
+          <p className='premium-probe-traffic-note'>
+            以下为原始上、下行，不应用计费方向或对账调整。
+          </p>
+          <div className='traffic-line-toggle'>
+            {(
+              [
+                { key: 'total', label: '总流量', stroke: '#3b82f6' },
+                { key: 'uplink', label: '上行流量', stroke: '#f97316' },
+                { key: 'downlink', label: '下行流量', stroke: '#22c55e' },
+              ] as const
+            ).map((line) => (
+              <button
+                type='button'
+                key={line.key}
+                className={trafficLines.has(line.key) ? 'active' : 'off'}
+                style={{ '--line-color': line.stroke } as React.CSSProperties}
+                onClick={() => toggleTrafficLine(line.key)}
+              >
+                <span className='dot' />
+                {line.label}
+              </button>
             ))}
+          </div>
+          <div className='premium-probe-drawer-traffic'>
+            {traffic.length === 0 ? (
+              <p>暂无每日流量数据</p>
+            ) : (
+              traffic.map((item) => (
+                <div key={item.date}>
+                  <span>{item.date.slice(5)}</span>
+                  <i>
+                    {trafficLines.has('downlink') && (
+                      <b
+                        style={{
+                          width: `${(item.downlink / maxTraffic) * 100}%`,
+                        }}
+                      />
+                    )}
+                    {trafficLines.has('uplink') && (
+                      <b
+                        style={{ width: `${(item.uplink / maxTraffic) * 100}%` }}
+                      />
+                    )}
+                  </i>
+                  <strong>
+                    {trafficLines.has('total')
+                      ? formatTrafficCompact(item.total)
+                      : item.uplink !== undefined && item.downlink !== undefined && trafficLines.size === 2
+                        ? `${formatTrafficCompact(trafficLines.has('uplink') ? item.uplink : item.downlink)}`
+                        : trafficLines.has('uplink') || trafficLines.has('downlink')
+                          ? `${formatTrafficCompact(trafficLines.has('uplink') ? item.uplink : item.downlink)}`
+                          : '—'}
+                  </strong>
+                </div>
+              ))
+            )}
           </div>
         </section>
         <section className='premium-probe-drawer-section'>
@@ -2236,14 +2387,68 @@ export function PremiumProbePage({
     if (typeof window === 'undefined') return true
     return localStorage.getItem('premium-probe-watermark') !== '0'
   })
-  // 白金配色开关（黑金 ⇄ 白金，复用全局 darkOverride=platinum）
-  const [platinum, setPlatinum] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false
-    return document.documentElement.classList.contains('platinum')
+  // 配色模式: auto(北京时间白天白金/晚上黑金) ⇄ 白金 ⇄ 黑金 三态循环
+  // 直接操作 html class(不动全局 DARK_OVERRIDE, 避免污染其他主题), localStorage 记忆
+  const [colorMode, setColorMode] = useState<'auto' | 'platinum' | 'dark'>(() => {
+    if (typeof window === 'undefined') return 'auto'
+    const saved = localStorage.getItem('premium-probe-color-mode')
+    return saved === 'platinum' || saved === 'dark' ? saved : 'auto'
   })
-  const togglePlatinum = () => {
-    setDarkOverride(platinum ? null : 'platinum')
-    setPlatinum(!platinum)
+  // 用户手动点过按钮后, 主控下发不再驱动配色
+  const manualColorRef = useRef(false)
+  // 主控下发驱动: 纯 premium → auto; premiumplatinum/premiumlight → 白金。
+  // 仅当用户从未在探针上选过配色(localStorage 无 premium-probe-color-mode)时才驱动;
+  // 用户点过(含 auto)即持久记忆, 刷新后主控黑金/白金也不覆盖(2026-08-17 用户规则)
+  useEffect(() => {
+    if (manualColorRef.current) return
+    if (localStorage.getItem('premium-probe-color-mode')) return
+    const themeRaw = data?.appearance?.theme
+    if (!themeRaw) return
+    const parsed = parseThemeName(themeRaw)
+    if (parsed.platinum) {
+      if (colorMode !== 'platinum') setColorMode('platinum')
+    } else if (colorMode !== 'auto') {
+      setColorMode('auto')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.appearance?.theme])
+  const [autoPlatinum, setAutoPlatinum] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    const now = new Date()
+    const hour = (now.getUTCHours() + 8) % 24 // 北京时间(UTC+8)
+    return hour >= 6 && hour < 18
+  })
+  useEffect(() => {
+    localStorage.setItem('premium-probe-color-mode', colorMode)
+    const apply = () => {
+      if (colorMode === 'auto') {
+        const now = new Date()
+        const hour = (now.getUTCHours() + 8) % 24
+        const isDay = hour >= 6 && hour < 18
+        document.documentElement.classList.toggle('platinum', isDay)
+        setAutoPlatinum(isDay)
+      } else {
+        document.documentElement.classList.toggle('platinum', colorMode === 'platinum')
+      }
+    }
+    apply()
+    if (colorMode !== 'auto') return
+    const timer = window.setInterval(apply, 60_000) // 跨 6/18 点自动切换
+    // iOS/Safari 后台标签 interval 会被冻结: 回到前台立即重算, 不等下一个 60s tick
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') apply()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [colorMode])
+  const cycleColorMode = () => {
+    manualColorRef.current = true
+    setColorMode((prev) => (prev === 'auto' ? 'platinum' : prev === 'platinum' ? 'dark' : 'auto'))
   }
   // 底部许可证动画开关（默认开，localStorage 记忆）
   const [licenseAnim, setLicenseAnim] = useState<boolean>(() => {
@@ -2428,13 +2633,27 @@ export function PremiumProbePage({
           </button>
           <button
             type='button'
-            className={`premium-probe-login premium-probe-platinum-toggle${platinum ? ' is-on' : ''}`}
-            aria-label={platinum ? '切换黑金配色' : '切换白金配色'}
-            aria-pressed={platinum}
-            title={platinum ? '切换到黑金配色' : '切换到白金配色（浅色版）'}
-            onClick={togglePlatinum}
+            className={`premium-probe-login premium-probe-platinum-toggle${colorMode === 'dark' || (colorMode === 'auto' && !autoPlatinum) ? '' : ' is-on'}`}
+            aria-label={
+              colorMode === 'auto'
+                ? autoPlatinum
+                  ? '自动配色·白天白金(点击切到白金)'
+                  : '自动配色·晚上黑金(点击切到白金)'
+                : colorMode === 'platinum'
+                  ? '白金配色(点击切到黑金)'
+                  : '黑金配色(点击切到自动)'
+            }
+            aria-pressed={colorMode !== 'dark' && (colorMode !== 'auto' || autoPlatinum)}
+            title={
+              colorMode === 'auto'
+                ? `自动配色: 白天白金 / 晚上黑金(当前${autoPlatinum ? '白金' : '黑金'})`
+                : colorMode === 'platinum'
+                  ? '白金配色 → 点击切到黑金配色'
+                  : '黑金配色 → 点击切到自动配色(白天白金/晚上黑金)'
+            }
+            onClick={cycleColorMode}
           >
-            <Crown />
+            {colorMode === 'auto' ? <SunMoon /> : colorMode === 'platinum' ? <Crown /> : <Moon />}
           </button>
           <PremiumThemeSelect onThemeChange={onThemeChange} />
         </nav>
