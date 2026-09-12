@@ -92,6 +92,10 @@ button {
   display: flex;
   gap: 6px;
 }
+.topbar .probe-passkey-error {
+  left: 0;
+  right: auto;
+}
 .topbar button,
 .ranges button {
   min-width: 36px;
