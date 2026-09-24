@@ -1,4 +1,5 @@
 import { useNetworkSpeed } from './use-network-speed'
+import { ConnectionCounts, UnlockButton, UnlockDetails } from './ServerCapabilities'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
@@ -193,22 +194,24 @@ type PremiumProbePageProps = {
   isLoading: boolean
   isError: boolean
   // 主题切换回调（经典界面 ThemeSelect 同款语义: name=null 表示跟随主控）
-  onThemeChange?: (name: 'pixel' | 'flat' | 'anime' | 'glass' | 'lumina' | 'premium' | 'ran' | 'glassmorphism' | 'emerald' | null) => void
+  onThemeChange?: (name: 'pixel' | 'flat' | 'anime' | 'glass' | 'lumina' | 'premium' | 'ran' | 'glassmorphism' | 'emerald' | 'lite' | 'luminaplus' | null) => void
 }
 
 type StatusFilter = 'all' | 'online' | 'offline'
 type PremiumProbeView = 'card' | 'network' | 'resource'
 
-const PREMIUM_THEME_OPTIONS: { value: 'pixel' | 'flat' | 'anime' | 'glass' | 'lumina' | 'premium' | 'ran' | 'glassmorphism' | 'emerald'; label: string }[] = [
+const PREMIUM_THEME_OPTIONS: { value: 'pixel' | 'flat' | 'anime' | 'glass' | 'lumina' | 'premium' | 'ran' | 'glassmorphism' | 'emerald' | 'lite' | 'luminaplus'; label: string }[] = [
   { value: 'pixel', label: '像素' },
   { value: 'flat', label: '扁平' },
   { value: 'anime', label: '动漫' },
   { value: 'glass', label: '玻璃' },
   { value: 'lumina', label: 'Lumina' },
+  { value: 'luminaplus', label: 'LuminaPlus' },
   { value: 'premium', label: 'Premium' },
   { value: 'ran', label: '岚 · Ran' },
   { value: 'glassmorphism', label: 'Glassmorphism' },
   { value: 'emerald', label: 'Emerald' },
+  { value: 'lite', label: 'Lite' },
 ]
 
 // 主题切换下拉（黑金风）。当前必然是 premium（本页就是），选择其他主题或"跟随主控"时回调上层切换。
@@ -228,7 +231,7 @@ function PremiumThemeSelect({ onThemeChange }: { onThemeChange?: PremiumProbePag
     return () => document.removeEventListener('mousedown', handle)
   }, [open])
 
-  const pick = (name: 'pixel' | 'flat' | 'anime' | 'glass' | 'lumina' | 'premium' | 'ran' | 'glassmorphism' | 'emerald' | null) => {
+  const pick = (name: 'pixel' | 'flat' | 'anime' | 'glass' | 'lumina' | 'premium' | 'ran' | 'glassmorphism' | 'emerald' | 'lite' | 'luminaplus' | null) => {
     setOpen(false)
     if (name === 'premium') return // 已在 Premium，无需切换
     onThemeChange?.(name)
@@ -2588,6 +2591,7 @@ function PremiumServerCard({
             {health.score} · {health.label}
           </span>
         )}
+        <UnlockButton server={server} />
         <span className='premium-probe-server-status'>
           <i
             className={cn(
@@ -2618,6 +2622,7 @@ function PremiumServerCard({
           percent={disk}
         />
       </div>
+      <ConnectionCounts server={server} variant="card" />
       <div className='premium-probe-server-footer'>
         <div className='premium-probe-card-traffic'>
           <span>周期流量</span>
@@ -2934,6 +2939,13 @@ function ServerDetailDrawer({
               ))
             )}
           </div>
+        </section>
+        <section className='premium-probe-drawer-section'>
+          <UnlockDetails key={index} unlocks={server.unlocks} />
+        </section>
+        <section className='premium-probe-drawer-section'>
+          <h3>网络连接</h3>
+          <ConnectionCounts server={server} />
         </section>
         <section className='premium-probe-drawer-section premium-probe-drawer-info'>
           <h3>系统与续费</h3>
