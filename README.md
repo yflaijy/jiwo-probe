@@ -6,6 +6,11 @@
 
 与原版的差异（定制增强）：
 
+### 统一新版 Premium 地球仪（2026-10-02）
+
+- 所有已有地球视图统一复用上游 `7d8d8ef` 的 Premium 地球组件：Premium、Glassmorphism、Emerald 和通用主题不再各自保留旧版渲染器。原本没有地球的主题不新增地球入口。
+- 地区标签按真实经纬度排布，拖动时随地球重新定位；背面地区降亮度，标签限制在视口内。保留轨道流动光点、地区高亮与服务器数量，以及各主题的明暗配色和主控 `show_globe` 开关。不改许可证、卡片与历史数据。
+
 ### 主控连接数折线与转发链（2026-10-01）
 
 - 主控「连接数折线图（TCP / UDP 近 1 小时）」开启后，首页卡片读取快照中的 `conn_history`，显示 TCP / UDP 同轴小折线。12 个五分钟均值从旧到新排列，悬停或键盘左右键可查看整数显示的均值；缺失桶断开，不补零。字段未下发时不显示小折线；空历史显示等待采样，不伪造数据。
@@ -404,11 +409,22 @@ npm run dev
 
 访问 `http://localhost:5173`。Vite 会把 `/api/*` 转发到本地 Worker 的 `8787` 端口。
 
+### 公共模块与主题边界
+
+- `src/server-format.ts`：共用流量格式、地区显示、到期判断及图表格式化。
+- `src/server-health.ts`：健康评分与相关资源/延迟计算，不依赖 Premium 页面。
+- `src/charts/`：共用流量、延迟、系统历史图及横轴交互容器。
+- `src/components/`：共用系统图标、回程标签、Lumina 状态条与许可证页尾；许可证内容仍只从原配置读取。
+- 主题和详情页直接引用公共模块，不从 `App.tsx` 或 `PremiumProbePage.tsx` 导入工具或组件。Premium 保持动态加载，样式随主题加载。
+
+`npm test` 包含公共计算边界与静态依赖检查，防止重新引入页面反向引用和循环依赖。调整模块后还需执行 `npm run build`，并检查桌面/手机下的主题切换、详情弹窗与图表。此阶段仅整理依赖，不改变主控数据、计费口径、许可证内容或 Ran。
+
 ## 常用命令
 
 ```bash
 npm run dev        # 启动 Vite 开发服务器
 npm run typecheck  # TypeScript 类型检查
+npm test           # 业务逻辑与模块依赖回归测试
 npm run build      # 生成 dist 生产文件
 npm run preview    # 本地预览生产构建
 npm run deploy     # 构建并部署到 Cloudflare Workers
