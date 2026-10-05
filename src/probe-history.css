@@ -1,6 +1,6 @@
-/* Probe history v1.1 · 2026-10-02 — TCP/UDP 曲线与图例跟随主题配色。 */
+/* Probe history v1.2 · 2026-10-04 — TCP/UDP 曲线与图例跟随主题配色；经典主题文字色读 --foreground（含 Lumina 黑金/深色）。 */
 :is(.probe-conn-history, .probe-history-dialog, .probe-forward) {
-  --ph-bg: var(--surface, #fff); --ph-text: var(--text, #172033); --ph-muted: var(--muted, #64748b);
+  --ph-bg: var(--surface, #fff); --ph-text: var(--text, var(--foreground, #172033)); --ph-muted: var(--muted, #64748b);
   --ph-line: var(--border, #e2e8f0); --ph-tcp: #169b78; --ph-udp: #4385d5;
   color: var(--ph-text); box-sizing: border-box; font-family: inherit;
 }
@@ -79,6 +79,7 @@ dialog.probe-history-dialog { width: min(860px, calc(100vw - 24px)); max-height:
 .probe-forward-detail > header h3 { margin: 0; font-size: 14px; color: var(--ph-text); }
 .probe-forward-detail > header h3 span { padding: 1px 7px; border-radius: 999px; font-size: 11px; color: var(--fw); background: color-mix(in srgb, var(--fw) 12%, var(--ph-bg)); }
 .probe-forward-detail > header strong { margin-left: 6px; color: var(--ph-text); }
+.probe-forward-interval { margin-left: 4px; font-size: 11px; color: var(--ph-muted); }
 .probe-forward-detail > header p { flex-basis: 100%; margin: 0; color: var(--fw); }
 .probe-forward-topology { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding-bottom: 6px; }
 .probe-forward-group { flex: 1 0 190px; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--ph-line); border-radius: 10px; }
@@ -100,9 +101,23 @@ dialog.probe-history-dialog { width: min(860px, calc(100vw - 24px)); max-height:
 .probe-forward-panel { min-width: 0; }
 .probe-forward-panel h4 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--ph-muted); }
 .probe-forward-trend { height: 170px; }
+.probe-forward-panel h4 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.probe-forward-legend { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font-weight: 500; }
+.probe-forward-legend i { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--ph-tcp); margin-left: 6px; }
+.probe-forward-legend i[data-series="loss"] { border-top: 1.5px dashed var(--fw-down); }
 .probe-forward-bars { display: grid; grid-template-columns: repeat(7, 1fr); align-items: end; gap: 6px; height: 120px; }
-.probe-forward-bars span { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; min-width: 0; }
+.probe-forward-bars button { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; min-width: 0; padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.probe-forward-bars button:hover { background: color-mix(in srgb, var(--ph-udp) 8%, transparent); }
+.probe-forward-bars button:focus-visible { outline: 2px solid var(--ph-udp); outline-offset: 1px; }
 .probe-forward-bars i { width: 100%; max-width: 28px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--ph-udp) 75%, var(--ph-bg)); }
+/* 选中某天：其余柱子变淡，选中的加深 */
+.probe-forward-bars[data-selected] button:not([aria-pressed="true"]) i { opacity: .35; }
+.probe-forward-bars button[aria-pressed="true"] i { background: var(--ph-udp); }
+.probe-forward-bars button[aria-pressed="true"] small { color: var(--ph-text); font-weight: 600; }
+.probe-forward-hint { margin: 8px 0 0; font-size: 11px; color: var(--ph-muted); }
+.probe-forward-day > p { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 12px; color: var(--ph-muted); }
+.probe-forward-day > p strong { color: var(--ph-text); }
+.probe-forward-day > p button { margin-left: auto; padding: 3px 8px; border: 1px solid var(--ph-line); border-radius: 6px; background: transparent; color: var(--ph-text); font: inherit; font-size: 11px; cursor: pointer; }
 .probe-forward-bars small { font-size: 10px; color: var(--ph-muted); }
 .probe-forward-top { display: grid; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; font-size: 12px; }
 .probe-forward-top li { display: flex; align-items: center; gap: 8px; min-width: 0; }
