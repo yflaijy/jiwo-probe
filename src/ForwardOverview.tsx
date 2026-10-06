@@ -1,8 +1,9 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useMemo, useState, type CSSProperties } from 'react'
 import { ChevronDown, Network } from 'lucide-react'
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import type { ProbePayload } from './types'
-import { chainTraffic, chainTrafficDay, formatGb, forwardSummary, groupHealth, hopTone, latencyTone, sortChains, type ForwardStatus } from './forward-model'
+import type { ProbePayload, ProbeServer } from './types'
+import { chainTraffic, chainTrafficDay, flowDuration, flowLevel, formatGb, forwardSummary, groupHealth, hopTone, latencyTone, mayHaveRouteSelection, routeFork, sortChains, trendCells, type ForwardStatus } from './forward-model'
+import { useNetworkSpeed } from './use-network-speed'
 import './probe-history.css'
 
 const roles = { entry: '入口', mid: '中转', exit: '出口' }
@@ -27,12 +28,17 @@ export function ForwardOverview({ data }: { data: ProbePayload }) {
   // 选中的某一天（按链记录，切换链路时自动回到 7 天汇总）
   const [daySel, setDaySel] = useState<{ chain: string; index: number } | null>(null)
   const [open, setOpen] = useState(readOpen)
+  const networkSpeed = useNetworkSpeed()
+  // 转发链里的服务器按名称对应快照里的实时上下行（byte/s），每 3 秒随快照刷新
+  const liveByName = useMemo(() => new Map((data.servers || []).filter((server) => server.name).map((server) => [server.name as string, server])), [data.servers])
+  const liveBytes = (server?: ProbeServer) => server ? (server.upload_speed || 0) + (server.download_speed || 0) : 0
   if (data.show_forward === false || (!data.show_forward && !data.forward?.length)) return null
   const chains = sortChains(data.forward || [])
   const summary = forwardSummary(data.forward || [])
   const current = chains.find((item) => item.chain.name === selected) || chains[0]
   const chain = current?.chain
   const traffic = chain ? chainTraffic(chain) : null
+  const fork = chain ? routeFork(chain) : null
   const peak = traffic ? Math.max(...traffic.daily.map((item) => item.gb), 0) : 0
   const dayIndex = chain && daySel?.chain === chain.name ? daySel.index : null
   const dayDetail = chain && dayIndex !== null ? chainTrafficDay(chain, dayIndex) : null
@@ -52,6 +58,9 @@ export function ForwardOverview({ data }: { data: ProbePayload }) {
             <span className="probe-forward-chain-name"><i aria-hidden="true" />{item.chain.name}</span>
             <span className="probe-forward-chain-stats"><strong data-tone={latencyTone(item.chain.end_to_end_ms)}>{latency(item.chain.end_to_end_ms)}</strong><span title={probeInterval(item.chain.bucket_sec)}>丢包 {loss(item.chain.loss_pct)}</span>{total !== undefined && <span>7 天 {formatGb(total)}</span>}</span>
             {item.reasons.length > 0 && <small>{item.reasons.join(' · ')}</small>}
+            {!!item.chain.trend?.length && <span className="probe-forward-cells" aria-label={`近 ${Math.round(item.chain.trend.length * (item.chain.bucket_sec || 300) / 60)} 分钟状态`}>
+              {trendCells(item.chain).map((cell) => <i key={cell.ts} data-tone={cell.tone} title={cell.label} />)}
+            </span>}
           </button>
         })}
       </div>
@@ -62,22 +71,56 @@ export function ForwardOverview({ data }: { data: ProbePayload }) {
         </header>
         <div className="probe-forward-topology" aria-label={`${chain.name} 转发拓扑`}>
           {chain.groups.map((group, index) => {
+            const isFork = fork?.hop === index
             const health = groupHealth(group)
             const groupStatus = !health || health.total === 0 ? undefined : health.healthy === 0 ? 'down' : health.healthy < health.total ? 'warn' : 'ok'
             const tone = hopTone(group)
+            // 连线光点：速度按到下一组的延迟，密度按本组服务器的实时流量
+            const groupBytes = group.servers.reduce((sum, server) => sum + liveBytes(liveByName.get(server.name)), 0)
+            const flow = tone === 'down' ? 0 : flowLevel(groupBytes)
             return <Fragment key={`${group.name}-${index}`}>
               <section className="probe-forward-group" data-status={groupStatus}>
                 <h3><small>{roles[group.role]}</small><span title={group.name}>{group.name}</span>{health && <em>{health.healthy}/{health.total} 可用</em>}</h3>
-                <ul>{group.servers.map((server, i) => <li key={`${server.name}-${i}`}>
-                  {group.role !== 'exit' && <i data-healthy={server.healthy} title={server.healthy ? '探测正常' : '探测异常'} />}
-                  <span title={server.name}>{server.name}</span>
-                  {group.role !== 'exit' && <strong data-tone={server.healthy ? latencyTone(server.to_next_ms) : 'down'}>{server.healthy ? latency(server.to_next_ms) : '不可达'}</strong>}
-                </li>)}</ul>
+                <ul>{group.servers.map((server, i) => {
+                  const live = liveByName.get(server.name)
+                  return <li key={`${server.name}-${i}`}>
+                    {group.role !== 'exit' && <i data-healthy={server.healthy} title={server.healthy ? '探测正常' : '探测异常'} />}
+                    <span title={server.name}>{server.name}</span>
+                    {live && <em className="probe-forward-speed" data-active={flowLevel(liveBytes(live)) > 0 || undefined} title="实时上行 / 下行">
+                      <span>↑ {networkSpeed(live.upload_speed)}</span><span>↓ {networkSpeed(live.download_speed)}</span>
+                    </em>}
+                    {group.role !== 'exit' && <strong data-tone={server.healthy ? latencyTone(server.to_next_ms) : 'down'}>{server.healthy ? latency(server.to_next_ms) : '不可达'}</strong>}
+                    {group.role !== 'exit' && typeof server.loss_pct === 'number' && server.loss_pct > 0 && <small className="probe-forward-server-loss" title="本台到下一跳的丢包率">丢包 {loss(server.loss_pct)}</small>}
+                    {server.route && <small className="probe-forward-route-tag" title="当前走的路">→ {server.route}</small>}
+                  </li>
+                })}</ul>
               </section>
-              {index < chain.groups.length - 1 && <span className="probe-forward-hop" data-tone={tone} title={tone === 'down' ? '该组无可用服务器' : '到下一组的延迟'}><b>{tone === 'down' ? '中断' : latency(group.to_next_ms)}</b><i aria-hidden="true" /></span>}
+              {isFork && fork && <div className="probe-forward-fork" role="group" aria-label="选路段">
+                <p>选路段{fork.policy && <> · {fork.policy}</>}</p>
+                {fork.routes.map((route) => {
+                  const routeBytes = (route.selected_by || []).reduce((sum, name) => sum + liveBytes(liveByName.get(name)), 0)
+                  const routeFlow = route.selected && route.tone !== 'down' ? flowLevel(routeBytes) : 0
+                  return <div key={route.name} className="probe-forward-route" data-selected={route.selected || undefined}>
+                    <div className="probe-forward-route-head">
+                      <strong>{route.name}</strong>
+                      <span className="probe-forward-route-via">{route.via.length ? route.via.map((name) => <em key={name}>{name}</em>) : <em data-direct>直连</em>}</span>
+                      <b data-tone={route.tone}>{latency(route.latency_ms)}</b>
+                      {route.loss_pct > 0 && <small data-tone={route.loss_pct >= 5 ? 'down' : 'ok'}>丢包 {loss(route.loss_pct)}</small>}
+                    </div>
+                    <span className="probe-forward-hop" data-tone={route.tone} data-flow={routeFlow} style={{ '--fw-flow-duration': `${flowDuration(route.latency_ms)}s` } as CSSProperties}><i aria-hidden="true" /></span>
+                    <small className="probe-forward-route-by">{route.selected ? `在用${route.selected_by?.length ? `：${route.selected_by.join('、')}` : ''}` : '备用'}</small>
+                  </div>
+                })}
+              </div>}
+              {!isFork && index < chain.groups.length - 1 && <span className="probe-forward-hop" data-tone={tone} data-flow={flow}
+                style={{ '--fw-flow-duration': `${flowDuration(group.to_next_ms)}s` } as CSSProperties}
+                title={tone === 'down' ? '该组无可用服务器' : `到下一组 ${latency(group.to_next_ms)} · 本组实时 ${networkSpeed(groupBytes)}`}>
+                <b>{tone === 'down' ? '中断' : latency(group.to_next_ms)}</b><i aria-hidden="true" />
+              </span>}
             </Fragment>
           })}
         </div>
+        {mayHaveRouteSelection(chain) && <p className="probe-forward-note">主控接口暂未提供选路结构：连续多个中转组可能是「选路段」里的并行路线（按最低延迟择一），此处按顺序画出，端到端延迟按各段相加，可能偏高。</p>}
         <div className="probe-forward-panels">
           {!!chain.trend?.length && <div className="probe-forward-panel"><h4>端到端延迟与丢包 · 近 {Math.round(chain.trend.length * (chain.bucket_sec || 300) / 60)} 分钟
               <span className="probe-forward-legend"><i data-series="latency" />延迟<i data-series="loss" />丢包</span></h4>
@@ -89,10 +132,10 @@ export function ForwardOverview({ data }: { data: ProbePayload }) {
                 loss: Number.isFinite(point.loss) && point.loss >= 0 ? point.loss : null,
               }))} margin={{ top: 10, left: 0, right: 0, bottom: 0 }}>
                 <XAxis dataKey="ts" type="number" domain={['dataMin', 'dataMax']} tickFormatter={time} tick={{ fontSize: 11 }} minTickGap={30} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="ms" width={55} tick={{ fontSize: 11 }} tickFormatter={(value) => `${value} ms`} domain={[0, 'auto']} axisLine={false} tickLine={false} />
+                <YAxis yAxisId="ms" width={55} tick={{ fontSize: 11 }} tickFormatter={(value) => `${value} ms`} allowDecimals={false} tickCount={5} domain={[0, (max: number) => Math.max(4, Math.ceil(max * 1.15 / 4) * 4)]} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="loss" orientation="right" width={44} tickCount={3} allowDecimals={false} tick={{ fontSize: 11 }} tickFormatter={(value) => `${value}%`} domain={[0, (max: number) => Math.min(100, Math.max(10, Math.ceil(max / 10) * 10))]} axisLine={false} tickLine={false} />
                 <Tooltip formatter={(value, name) => name === 'loss' ? [`${Number(value).toFixed(1)}%`, '丢包'] : [latency(Number(value)), '端到端延迟']} labelFormatter={(value) => time(Number(value))} />
-                <Line yAxisId="ms" dataKey="e2e_ms" name="e2e_ms" type="linear" stroke="var(--ph-tcp)" strokeWidth={2} dot={chain.trend.length === 1} connectNulls={false} isAnimationActive={false} />
+                <Line yAxisId="ms" dataKey="e2e_ms" name="e2e_ms" type="linear" stroke="var(--ph-accent)" strokeWidth={2} dot={chain.trend.length === 1} connectNulls={false} isAnimationActive={false} />
                 <Line yAxisId="loss" dataKey="loss" name="loss" type="stepAfter" stroke="var(--fw-down)" strokeWidth={1.5} strokeDasharray="4 3" dot={chain.trend.length === 1} connectNulls={false} isAnimationActive={false} />
               </LineChart></ResponsiveContainer>
             </div>

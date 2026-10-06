@@ -1,6 +1,50 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { chainStatus, chainTraffic, chainTrafficDay, formatGb, forwardSummary, hopTone, latencyTone, sortChains } from './forward-model.ts'
+import { chainStatus, chainTraffic, chainTrafficDay, flowDuration, flowLevel, formatGb, forwardSummary, hopTone, latencyTone, mayHaveRouteSelection, routeFork, sortChains, trendCells } from './forward-model.ts'
+
+test('选路段：按 route_hop 分叉，带策略说明与各路状态；有 routes 时不再提示可能是选路', () => {
+  const chain = {
+    name: 'akari', end_to_end_ms: 15, loss_pct: 0, bucket_sec: 300, trend: [],
+    groups: [
+      { name: '入口', role: 'entry', to_next_ms: 6, servers: [{ name: 'a', to_next_ms: 5, healthy: true, route: '路1' }] },
+      { name: '出口', role: 'exit', to_next_ms: 0, servers: [{ name: 'x', to_next_ms: 0, healthy: false }] },
+    ],
+    route_hop: 0, route_policy: 'lowest_latency', failover_ms: 150,
+    routes: [
+      { name: '路1', via: [], latency_ms: 16, loss_pct: 0, selected: true, selected_by: ['a'] },
+      { name: '路2', via: ['组3'], latency_ms: 200, loss_pct: 0, selected: false },
+      { name: '路3', via: ['组4'], latency_ms: 16, loss_pct: 80, selected: false },
+    ],
+  }
+  const fork = routeFork(chain)
+  assert.equal(fork.hop, 0)
+  assert.equal(fork.policy, '最低延迟优先 · 故障转移 150 ms')
+  assert.deepEqual(fork.routes.map(r => r.tone), ['good', 'hi', 'down'])
+  assert.equal(mayHaveRouteSelection(chain), false)
+  assert.equal(routeFork({ ...chain, route_hop: 1 }), null, '分叉不能在最后一组之后')
+  assert.equal(routeFork({ ...chain, routes: [] }), null)
+})
+
+test('状态条每段按链路口径着色，无数据为 idle', () => {
+  const c = { name: 't', end_to_end_ms: 20, loss_pct: 0, bucket_sec: 300, groups: [], trend: [
+    { ts: 1, e2e_ms: 20, loss: 0 }, { ts: 2, e2e_ms: 200, loss: 0 }, { ts: 3, e2e_ms: 20, loss: 25 },
+    { ts: 4, e2e_ms: 20, loss: 60 }, { ts: 5, e2e_ms: 0, loss: 0 },
+  ] }
+  assert.deepEqual(trendCells(c).map(cell => cell.tone), ['ok', 'warn', 'warn', 'down', 'idle'])
+  assert.match(trendCells(c)[2].label, /20 ms · 丢包 25\.0%$/)
+})
+
+test('连续两个以上中转组提示可能是选路段；单个中转不提示', () => {
+  const groups = roles => ({ name: 'r', groups: roles.map((role, i) => ({ name: `g${i}`, role, to_next_ms: 5, servers: [] })) })
+  assert.equal(mayHaveRouteSelection(groups(['entry', 'mid', 'mid', 'exit'])), true)
+  assert.equal(mayHaveRouteSelection(groups(['entry', 'mid', 'exit'])), false)
+  assert.equal(mayHaveRouteSelection(groups(['entry', 'exit'])), false)
+})
+
+test('流动档位按实时 bit/s 划分（主控为 byte/s），流动速度按延迟换算', () => {
+  assert.deepEqual([0, 5_000, 20_000, 1_000_000, 5_000_000].map(flowLevel), [0, 0, 1, 2, 3])
+  assert.deepEqual([1, 14, 120, 500, 0, undefined].map(flowDuration), [0.8, 1, 2.8, 3.2, 2.4, 2.4])
+})
 
 const server = (name, healthy, to_next_ms = 5) => ({ name, healthy, to_next_ms })
 const chain = (name, { e2e = 20, loss = 0, entry = [true, true], mid, exitHealthy = false, trend = [{ ts: 1, e2e_ms: 20, loss: 0 }], traffic = null } = {}) => ({

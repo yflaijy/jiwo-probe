@@ -103,3 +103,76 @@ export function chainTrafficDay(chain: ForwardChainData, dayIndex: number) {
     .sort((a, b) => b.gb - a.gb)
   return { date: traffic.days[dayIndex], total: servers.reduce((sum, server) => sum + server.gb, 0), servers }
 }
+
+export type CellTone = ForwardStatus | 'idle'
+
+/** 链路卡片状态条：每个 bucket 一格，判断口径与整条链一致（无数据为 idle）。 */
+export function trendCells(chain: ForwardChainData): { ts: number; tone: CellTone; label: string }[] {
+  return (chain.trend || []).map((point) => {
+    const ms = finite(point.e2e_ms) ? point.e2e_ms : -1
+    const lossPct = finite(point.loss) ? point.loss : -1
+    const tone: CellTone = ms <= 0 && lossPct <= 0 ? 'idle'
+      : lossPct >= FORWARD_DOWN_LOSS ? 'down'
+      : lossPct >= FORWARD_WARN_LOSS || ms >= FORWARD_SLOW_MS ? 'warn'
+      : 'ok'
+    const time = new Date(point.ts * 1000).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+    const label = tone === 'idle' ? `${time} · 无数据` : `${time} · ${Math.round(ms)} ms · 丢包 ${lossPct.toFixed(1)}%`
+    return { ts: point.ts, tone, label }
+  })
+}
+
+/**
+ * 主控接口只下发按顺序排列的组，不含选路结构：连续两个以上中转组既可能是串联，也可能是
+ * 「选路段」里的多条并行路线（例如入口直连 / 经组 3 / 经组 4 按最低延迟择一）。
+ */
+export function mayHaveRouteSelection(chain: ForwardChainData): boolean {
+  if (chain.routes?.length) return false // 新版主控已下发选路结构
+  let run = 0
+  for (const group of chain.groups) {
+    run = group.role === 'mid' ? run + 1 : 0
+    if (run >= 2) return true
+  }
+  return false
+}
+
+// 与上游 Premium 转发页（c6839d2）同一组策略名
+const POLICY_LABEL: Record<string, string> = { lowest_latency: '最低延迟优先', failover: '按顺序故障转移', weighted: '按权重分流' }
+
+/**
+ * 选路段（主控 v0.5.6-beta.4 起，#1136）：groups[route_hop] 之后分叉成多条路，汇合到下一组。
+ * 返回分叉位置、各条路（含状态色）与策略说明；没有选路段或位置不合法时返回 null。
+ */
+export function routeFork(chain: ForwardChainData) {
+  const routes = chain.routes
+  const hop = chain.route_hop
+  if (!routes?.length || !finite(hop) || hop < 0 || hop >= chain.groups.length - 1) return null
+  const policy = [
+    chain.route_policy ? POLICY_LABEL[chain.route_policy] ?? chain.route_policy : '',
+    finite(chain.failover_ms) && chain.failover_ms > 0 ? `故障转移 ${chain.failover_ms} ms` : '',
+  ].filter(Boolean).join(' · ')
+  return {
+    hop,
+    policy,
+    routes: routes.map((route) => ({
+      ...route,
+      tone: (finite(route.loss_pct) && route.loss_pct >= FORWARD_DOWN_LOSS ? 'down' : latencyTone(route.latency_ms)) as HopTone,
+    })),
+  }
+}
+
+export type FlowLevel = 0 | 1 | 2 | 3
+
+/** 按一组服务器的实时上下行合计（主控下发为 byte/s，按 bit/s 分档）划分连线流动档位。 */
+export function flowLevel(bytesPerSecond: number): FlowLevel {
+  const bps = bytesPerSecond * 8
+  if (!finite(bps) || bps < 50_000) return 0
+  if (bps < 1_000_000) return 1
+  if (bps < 20_000_000) return 2
+  return 3
+}
+
+/** 连线光点流动一轮的秒数：延迟越低越快（0.8～3.2 秒）。 */
+export function flowDuration(ms: number | undefined): number {
+  if (!finite(ms) || ms <= 0) return 2.4
+  return Math.round(Math.min(3.2, Math.max(0.8, 0.8 + ms / 60)) * 10) / 10
+}
