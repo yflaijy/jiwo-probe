@@ -1,4 +1,4 @@
-export type ThemeName = 'pixel' | 'flat' | 'anime' | 'glass' | 'lumina' | 'premium' | 'ran' | 'glassmorphism' | 'emerald' | 'lite' | 'luminaplus'
+export type ThemeName = 'pixel' | 'flat' | 'anime' | 'glass' | 'lumina' | 'premium' | 'ran' | 'glassmorphism' | 'emerald' | 'lite' | 'luminaplus' | 'nezha'
 
 export interface ProbeBackgroundAppearance {
   url: string
@@ -44,6 +44,8 @@ export interface ProbeServer {
   region_name?: string
   region_city?: string
   online: boolean
+  /** 离线时的最后心跳（RFC3339）；在线时不下发 */
+  last_seen?: string
   upload_speed?: number
   download_speed?: number
   traffic_used?: number

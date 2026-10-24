@@ -19,6 +19,8 @@
 | [<img src="docs/screenshots/lumina.png" alt="Lumina" width="100%">](docs/screenshots/lumina.png) | [<img src="docs/screenshots/glassmorphism.png" alt="Glassmorphism" width="100%">](docs/screenshots/glassmorphism.png) |
 | **Emerald** | **岚 · Ran** |
 | [<img src="docs/screenshots/emerald.png" alt="Emerald" width="100%">](docs/screenshots/emerald.png) | [<img src="docs/screenshots/ran.png" alt="Ran" width="100%">](docs/screenshots/ran.png) |
+| **哪吒 · 浅色** | **哪吒 · 深色** |
+| [<img src="docs/screenshots/nezha-light.png" alt="哪吒浅色" width="100%">](docs/screenshots/nezha-light.png) | [<img src="docs/screenshots/nezha-dark.png" alt="哪吒深色" width="100%">](docs/screenshots/nezha-dark.png) |
 | **经典 · 扁平（浅色）** | **手机端 · LuminaPlus Paper** |
 | [<img src="docs/screenshots/flat.png" alt="经典扁平主题" width="100%">](docs/screenshots/flat.png) | <p align="center"><a href="docs/screenshots/mobile-luminaplus.png"><img src="docs/screenshots/mobile-luminaplus.png" alt="手机端 LuminaPlus Paper" width="220"></a></p> |
 
@@ -111,6 +113,16 @@ Lumina 的普通浅色／暗色使用 Claude Paper 纸面布局与莫兰迪配�
 - 卡片始终保留电信／联通／移动三格回程，缺失线路保持 Unknown；三组延迟、四类解锁／金色全解锁、TCP/UDP 图标与历史、全局速度单位、每 TB 费用继续使用 Jiwo 现有实现；卡片续费单价优先显示主控换算后的人民币，外币服务器在后面附原币种价格，没有换算时显示原币种。没有 V4/V6 状态或自定义套餐标签时不伪造，硬件标签仅使用真实配置。
 - `v0.3.7` 增加独立 Paper 配色开关；保留 `v0.3.6` 周期流量排行榜与实时速度排行榜。许可证仍放在整页内容最下方（与 Premium 一致，不悬浮遮挡卡片）；旁边的动画开关默认开启，浏览器独立记忆 `jiwo-luminaplus-license-anim`，关闭后停止动画并完整显示静态铭牌，保留原有许可证内容和样式。手机许可证单行横滑，开关独立占位；其他主题的位置与动画设置不变。样式版本与日期标记在 [luminaplus.css](src/luminaplus/luminaplus.css) 顶部。
 
+### 哪吒（独立主题）
+
+照哪吒监控 V1 默认前台 [nezha-dash-v1](https://github.com/hamster1963/nezha-dash-v1)（Apache-2.0）的页面结构与配色，用 Jiwo 自己的组件和主控快照数据重写，不打包对方的源码、插画、图标或字体；来源说明见 [`src/nezha/NOTICE.md`](src/nezha/NOTICE.md)。
+
+- 从右上角主题菜单选择 **哪吒**；主控主题名填 `nezha` 跟随系统明暗，`nezha-light` / `nezha-dark` 固定浅色或深色。页头的太阳／月亮按钮在 浅色 → 深色 → 自动 之间切换（自动：主控写了明暗后缀就跟随主控，否则跟随系统），访客选择优先。
+- 页面布局：页头（站点名、说明、Passkey 登录、主题选择、明暗、在线台数），「👋 概览」与当前时间，四张概览卡（总服务器、在线、离线、网络：本期上下行合计与实时网速），点在线 / 离线卡片筛选。
+- 控件行：地区分布（主控同款地球）、转发链、列表视图三个圆形开关，按地区分组的标签（哪吒的服务器分组在主控里没有对应，这里按地区分），搜索框，以及哪吒同款排序（默认、名称、在线时间、系统、CPU、内存、存储、上传、下载、上传总量、下载总量，可切换升降序）。开关、排序记在本浏览器。
+- 服务器卡片：在线点、国旗、名称，名字下面是价格、剩余天数与剩余比例条；CPU／内存／存储百分比与 3px 占用条（超过 70% 橙、超过 90% 红），上传／下载网速（跟随 `PROBE_NETWORK_SPEED_UNIT`），本期上传／下载流量，以及流量额度（绿）与三网回程（蓝）两种标签。离线卡片只留名称与计费信息。手机和平板（1024px 以下）卡片内容整体居中：在线点、国旗、名称一行，价格与剩余天数并排在下面，五项指标铺满整行。列表视图一行一台，多出系统、在线时间、上传／下载总量几列，放不下时横向滚动。
+- 点卡片打开与 Lite / LuminaPlus 相同的六标签详情页，配色跟随哪吒主题。默认自定义背景名单不含哪吒，需要时在 `PROBE_BACKGROUND_THEMES` 中加入 `nezha`。
+
 ### Lite（独立主题）
 
 借鉴 [tz.8787.de](https://tz.8787.de/) 的紧凑信息布局，使用 Jiwo 自己的数据接口和组件实现，不复制站点数据或品牌素材，也不替换已有主题。
@@ -168,6 +180,7 @@ Lumina 的普通浅色／暗色使用 Claude Paper 纸面布局与莫兰迪配�
 | `glassmorphism-dark` | Glassmorphism · 黑色模式（深蓝黑玻璃） |
 | `emerald` | Emerald 整页主题 |
 | `lite` / `lite-light` / `lite-dark` | Lite 自动明暗 / 固定浅色 / 固定深色 |
+| `nezha` / `nezha-light` / `nezha-dark` | 哪吒 跟随系统明暗 / 固定浅色 / 固定深色 |
 | `luminaplus` / `luminaplus-light` / `luminaplus-dark` | LuminaPlus 自动明暗 / 固定浅色 / 固定深色 |
 | `luminaplus-paper` | LuminaPlus 内的 Paper 陶纸暖纸配色（固定，不随时间变暗） |
 | 其他自定义名 | 经典界面 + `theme-{name}` 类（站长自写 CSS 接管） |
@@ -288,10 +301,13 @@ PROBE_PING_DEFAULT_TARGETS=内地延迟，海外延迟
 - **主控公开开关联动**——支持 `show_name` 隐藏服务器名称、`show_forward` 隐藏 Premium 网络状况中的转发链入口、`block_login` 禁止独立探针 `/login` 跳转主控；字段缺省时保持旧版行为
 - **多维榜单**——18 个维度 Top 10，按优先级排列：实时速度 → 今日流量 → 流量 → 流量使用率 → 近7日流量 → TCP 连接数 → UDP 连接数 → 内地丢包率 → 海外丢包率 → 内地延迟 → 海外延迟 → CPU → 内存 → 负载 → 磁盘 → 在线时长 → 到期时间 → 月成本。默认打开实时速度；Twemoji 国旗，前三金银铜徽章，点击当前维度切换升降序，到期时间默认升序（最快到期在前）。Emerald 对应顺序为：实时网速 → 流量消耗 → TCP 连接数 → UDP 连接数 → 网络质量 → 在线时长。
 - **榜单明细展开**——内地/海外延迟与丢包率维度，点击行尾箭头展开查看该节点每条线路的具体值（延迟 ms / 丢包率 %，超时与无数据区分显示）
+- **顶部指标**（经典主题：像素、扁平、动漫、玻璃、Lumina，照主控内置探针页）——4 列两行共 7 格：服务器（在线 / 总数、离线 · 告警 · 地区数、在线比例条）、连接数（TCP / UDP 合计与近 1 小时合计曲线）、实时网速（占两格，下行 / 上行与本页打开后近 3 分钟的曲线和峰值）、今日流量（近 7 天柱条）、本期流量额度（设了限额的服务器合计已用比例、超 80% 台数）、网络质量（在线服务器近 1 小时平均延迟与丢包，按 Premium 网络视图同一口径分优 / 中 / 差）、续费（30 天内待续费台数与金额、月均成本、最近到期，悬停看剩余价值）。今日流量与近 7 天和主控一致，不计日流量由累计值估算的机器（`daily_traffic_estimated`）。点「服务器」「续费」直接筛选；手机 2 列，实时网速占一整行。地区分布与多维榜单仍并排放在下面一行
+- **工具条**——搜索框之外加「告警」筛选（CPU、内存、硬盘或流量用量超过 90%）、排序（默认 / 名称 / CPU / 内存 / 网速 / 流量用量 / 到期日 / 延迟，没有数据的排最后）；卡片视图可按地区分组（标题显示旗帜和中文地区名）、切换标准 / 紧凑密度。排序、分组、密度记在本浏览器；宽屏时工具条吸顶
+- **经典卡片压紧**——进度条下写 CPU 核心 / 线程、内存与硬盘「已用 / 总量」、流量已用比例与重置日；超过 70% 变黄、超过 90% 变红，标题旁显示「健康」或最严重的一项（如「硬盘 93%」），告警卡片描红边。离线卡片只留规格、「最后在线 N 分钟前」（主控 `last_seen`）和续费信息。紧凑模式去掉连接数、连接数历史、延迟和回程，一屏放更多台；Lumina 卡片自带排版，不受紧凑模式影响
 - **搜索框**——按名称 / 地区 / 服务商即时过滤节点
 - **地区筛选下拉**——自定义组件，Twemoji 旗帜图片渲染（原生 `<select>` 在 Windows 下旗帜会显示成字母）
-- **地区分布折叠卡**——按地区聚合，全球 SVG 分布图
-- **资产总揽**——总剩余价值 / 月均成本 / 覆盖台数（按剩余天数折算，共享同一套算法），大数字垂直居中 + 左右分布
+- **地区分布折叠卡**——经典主题用主控内置探针同款地球：地区之间蓝紫拱形弧线与流动光点，亮点旁标国旗 + 台数并自动避让（`src/ProbeRegionGlobe.tsx`，移植上游 `989b8e7`）；深色、Lumina 黑金 / 白金各有海洋配色。Emerald、Glassmorphism、Premium 仍用 Premium 环绕标签地球
+- **剩余价值**——总剩余价值 / 覆盖台数（按剩余天数折算，共享同一套算法），在顶部「续费」指标上悬停查看
 - **服务器详情页**（hash 路由）——剩余价值、负载三值、上行/下行速度对称布局、到期与续费信息、回程线路、延迟/丢包率/日流量/负载趋势图、省市区展示；**健康分徽章**（头部在线状态旁：评分 · 等级，绿=健康/红=告警，悬停显示扣分原因——CPU/内存/硬盘压力、延迟、丢包、流量额度、到期时间综合评分；**跟随主控 `show_health_score` 开关，主控开启才显示**，经典详情页与金工 Premium 卡片/drawer 三处统一受控）；**趋势图鼠标跟随 tooltip 深色化**（跟随主题表面色 `--surface`，黑金/暗色下深底金字，浅色主题保持白底）
 - **系统历史曲线**——通用二级详情页（像素、扁平、动漫、玻璃、Lumina、Glassmorphism、Emerald）的趋势栏提供「CPU」「内存」「TCP/UDP」：连接数以 TCP／UDP 双线显示，支持分别隐藏曲线、主控允许的小时／多天范围与缩放适应。直接读取主控 series `metric=system`，连接数显示时四舍五入为整数，原始桶平均精度不变，缺失不补零；未配置 Ping 的服务器也可查看。Lite、LuminaPlus 保留「系统」页中的连接数双线图。
 - **主控多天历史**——通用趋势弹窗、详情趋势、Lite／LuminaPlus 延迟与系统页、Premium 网络历史共用范围规则：保留 1／6／24 小时；根据 `/api/probe` 的 `history_days`（1–7）增加不超出保留期的 3 天、7 天及实际配置天数。例如设为 5 天显示 1h／6h／24h／3d／5d，设为 7 天显示 1h／6h／24h／3d／7d。旧主控缺省为 1 天，不主动请求多天。桶宽优先取 API 的 `bucket_sec`，后备分别为 5／10／30 分钟、2–3 天 1 小时、4–7 天 2 小时；多天横坐标显示日期。无需新增 CF 变量，历史不足保留空档，不拼接浏览器采样、不增加后台采集频率。Ran 保持原样。
@@ -353,7 +369,7 @@ ProbeHub 连接或快照异常时会自动回退到原来的主控直连，不�
 - Node.js 22 或更高版本、npm 10 或更高版本
 - 主控具有可由 Cloudflare 访问的 HTTPS 地址
 
-九套主题的页首均提供 Passkey 登录入口，按钮、键盘焦点和错误提示随当前主题配色；Glassmorphism、Emerald 和 Ran（含各配色变体）使用各自的原生按钮样式。如需从外置探针使用 Passkey 登录，先在主控注册 Passkey，并在主控的 `MMWX_WEBAUTHN_RELATED_ORIGINS` 中加入探针完整来源（例如 `https://tz.example.com`）。探针只提供登录入口，不提供 Passkey 注册。
+十套主题的页首均提供 Passkey 登录入口，按钮、键盘焦点和错误提示随当前主题配色；Glassmorphism、Emerald 和 Ran（含各配色变体）使用各自的原生按钮样式。如需从外置探针使用 Passkey 登录，先在主控注册 Passkey，并在主控的 `MMWX_WEBAUTHN_RELATED_ORIGINS` 中加入探针完整来源（例如 `https://tz.example.com`）。探针只提供登录入口，不提供 Passkey 注册。
 
 先进入主控的"系统设置 → 探针"，启用探针、选择展示服务器和指标，然后生成"独立探针访问密钥"。密钥明文只显示一次，请立即保存，切勿提交到 Git。
 
@@ -507,9 +523,9 @@ npm run screenshots # 用虚拟数据重新生成 README 截图（需本机安�
 
 ## 上游同步
 
-本 fork 的功能基线已提升到上游 `e6f3a11`（2026-09-11）。`ab9233d` 至 `e6f3a11` 的外置探针 Passkey 登录、Premium 续费时间轴点击、移动端双行顶栏和白金三视图对比度修复已按本 fork 架构移植；Passkey Worker 只放行两条固定 POST 鉴权路径，不携带只读 `PROBE_TOKEN`。2026-10-03 继续跟进上游 10-01 的提交：`d26cf7b` 已移植（环上标签上限改为 `MAX_ORBIT_LABELS`，按最小间隔计算，Premium「地区状态」列出全部地区并在超高时滚动；拖动时标签平滑过渡，引线一直画到标签框；白金主题下引线和背面标签加深）；`a677a42` 的连接数折线悬停在本 fork 中已有竖线和提示框，这次补上 TCP/UDP 两个圆点；`343e258` 跳过：本 fork 卡片没有被裁切的悬停说明，并且有意保留「1000 GB」写法；`6834eb6` 跳过：`RegionGlobe` 已统一复用 Premium 地球组件。2026-10-06 移植 `c6839d2`（主控 #1136 选路段）：Premium 转发页的探测详情与组延迟详情改为并列各条路、入口成员标出走的路、服务器显示丢包，并为白金配色补上深色文字与暗金；各主题共用的转发链视图此前已按同一接口实现，这次补上「按顺序故障转移」「按权重分流」两种策略名。2026-10-09 移植 `4cf4ae7`（转发链数据补充）：按其类型注释修正 24 小时状态条编码（`d` 降级、`b` 中断，此前本 fork 把 `d` 当成中断），可用率与抖动兼容 `null`；固定纵轴按横向滚动条高度让位，修复刻度重影（#973）；CPU / 内存之外补上硬盘使用率历史（Lumina 卡片、服务器详情、Lite 详情），Premium 详情抽屉新增「资源使用率」分区，复用本地 `SystemTrendChart` 按 CPU / 内存 / 硬盘切换，未照搬上游的三线迷你折线；Worker 代理接口加来源校验，只放行本站页面（同源 `Origin`、`Sec-Fetch-Site: same-origin` 或本站 `Referer`），其余返回 404，并放在读边缘缓存之前。上游没有使用 `speed_up` / `speed_down`，本 fork 的链级网速保留。2026-10-08 补记 09-20 至 09-28 之间未登记的上游提交：`efccc8e`、`35f9cb1`（三网延迟分电信 / 联通 / 移动三行及色块条）有意不兼容，跳过；`9f6c90f` 的地球环上标签布局已随 `d26cf7b` 吸收，其中的三网部分同样跳过；`ca2b0f2`、`bf6e663`、`2ba3335` 的解锁检测（卡片徽标、流媒体 / AI / 其他分类面板、信息类服务只显示地区）已由本地 `unlocks.ts`、`ServerCapabilities.tsx` 实现；`8bee333`、`0b7f9ca` 的 TCP/UDP 连接数、连接数折线、按数据保存天数看多天曲线和永久续费本地已有；`ce5b7c3` 由全局网速单位 `PROBE_NETWORK_SPEED_UNIT` 统一换算覆盖；`e7168e3`、`7d8d8ef` 的 Premium 亮色对比度与筛选栏由本地白金配色规则覆盖（本地没有上游的 `traffic-accounting` 区块）。同日补上 `f6fc04b` 引入、本 fork 漏掉的 `/api/forward` Worker 路由，未知 `/api/*` 改为返回 404。此前 `d706d7e`、`31f7a4b`、`bd651cb`、`f6fc04b` 的转发链网络状况能力也已移植：优先读取 WS `payload.forward`、HTTP 兜底、按服务器/转发链固定位置切换、浅色主题与布局抖动修复、按组切换的每日流量堆叠柱状图。`6221dd1` 的原始上下行趋势、计费口径工具、`traffic_stats_mode` 修正、服务器旗标和动态地区图同样已吸收；与本地九套主题、Ran/Premium 定制大面积冲突的结构性重构不会直接覆盖，而是逐项移植功能，避免界面回退。更早吸收：`8d82a8b` 移除登录；`ce624cf` twemoji 本地化（public/twemoji/ ~3650 个本地 SVG，零外部依赖）；`3ed41ca` Premium 黑金 PRO 主题；`be3d03c`（表格网速列纵向 + ping-pair 单列）经评估与 fork 三视图布局不兼容，跳过；`5ce90c0` 探针表格优化（表格流量列增强）；基线 `2dc05b3`（2026-08-10）。后续本地迭代：ProbeHub 全局连接聚合、流量计费口径 drawer、趋势弹窗三线切换与手机端免滚动撑满、卡片单向计费修正、白金水印等。上游有更新时逐项移植、不整体合并（`src/styles.css`、`src/types.ts`、`src/use-probe.ts`、`src/PremiumProbePage.tsx` 有大量本地定制），流程见 [AGENTS.md](AGENTS.md)：
+本 fork 的功能基线已提升到上游 `e6f3a11`（2026-09-11）。`ab9233d` 至 `e6f3a11` 的外置探针 Passkey 登录、Premium 续费时间轴点击、移动端双行顶栏和白金三视图对比度修复已按本 fork 架构移植；Passkey Worker 只放行两条固定 POST 鉴权路径，不携带只读 `PROBE_TOKEN`。2026-10-03 继续跟进上游 10-01 的提交：`d26cf7b` 已移植（环上标签上限改为 `MAX_ORBIT_LABELS`，按最小间隔计算，Premium「地区状态」列出全部地区并在超高时滚动；拖动时标签平滑过渡，引线一直画到标签框；白金主题下引线和背面标签加深）；`a677a42` 的连接数折线悬停在本 fork 中已有竖线和提示框，这次补上 TCP/UDP 两个圆点；`343e258` 跳过：本 fork 卡片没有被裁切的悬停说明，并且有意保留「1000 GB」写法；`6834eb6` 跳过：`RegionGlobe` 已统一复用 Premium 地球组件。2026-10-06 移植 `c6839d2`（主控 #1136 选路段）：Premium 转发页的探测详情与组延迟详情改为并列各条路、入口成员标出走的路、服务器显示丢包，并为白金配色补上深色文字与暗金；各主题共用的转发链视图此前已按同一接口实现，这次补上「按顺序故障转移」「按权重分流」两种策略名。2026-10-09 移植 `4cf4ae7`（转发链数据补充）：按其类型注释修正 24 小时状态条编码（`d` 降级、`b` 中断，此前本 fork 把 `d` 当成中断），可用率与抖动兼容 `null`；固定纵轴按横向滚动条高度让位，修复刻度重影（#973）；CPU / 内存之外补上硬盘使用率历史（Lumina 卡片、服务器详情、Lite 详情），Premium 详情抽屉新增「资源使用率」分区，复用本地 `SystemTrendChart` 按 CPU / 内存 / 硬盘切换，未照搬上游的三线迷你折线；Worker 代理接口加来源校验，只放行本站页面（同源 `Origin`、`Sec-Fetch-Site: same-origin` 或本站 `Referer`），其余返回 404，并放在读边缘缓存之前。上游没有使用 `speed_up` / `speed_down`，本 fork 的链级网速保留。2026-10-23 移植 `989b8e7`（同步主控内置探针改版）：经典主题顶部改为指标格（本 fork 把资产总揽并进来成为第 7 格，原「节点情况」「网络情况」折叠卡片删除），工具条加告警筛选、排序、按地区分组、紧凑模式并在宽屏吸顶，卡片压紧并加核心 / 已用总量小字、健康标记、超 90% 描红，离线卡片显示规格与最后在线时间（`last_seen`），汇总与排序逻辑放在 `src/probe-overview.ts`；流量相关判断沿用卡片现有的 `traffic_used` 口径。地区分布继续和多维榜单同排、不放到指标右侧；经典主题的地球改用上游同款 `RegionGlobe`（`globe-arcs` 弧线 + `globe-labels` 亮点旁旗帜与台数，本地文件名 `ProbeRegionGlobe.tsx`），Emerald 等仍用 Premium 地球。顶部指标随后照主控内置探针页（比上游仓库这次更新的版本更丰富）重做为 7 格，原「平均占用」格去掉，剩余价值移到「续费」格的悬停说明；Premium 亮色下额度排行 / 成本排行 / 续费时间轴名称加深，本 fork 白金配色已更深（`#5f5244`），跳过。2026-10-08 补记 09-20 至 09-28 之间未登记的上游提交：`efccc8e`、`35f9cb1`（三网延迟分电信 / 联通 / 移动三行及色块条）有意不兼容，跳过；`9f6c90f` 的地球环上标签布局已随 `d26cf7b` 吸收，其中的三网部分同样跳过；`ca2b0f2`、`bf6e663`、`2ba3335` 的解锁检测（卡片徽标、流媒体 / AI / 其他分类面板、信息类服务只显示地区）已由本地 `unlocks.ts`、`ServerCapabilities.tsx` 实现；`8bee333`、`0b7f9ca` 的 TCP/UDP 连接数、连接数折线、按数据保存天数看多天曲线和永久续费本地已有；`ce5b7c3` 由全局网速单位 `PROBE_NETWORK_SPEED_UNIT` 统一换算覆盖；`e7168e3`、`7d8d8ef` 的 Premium 亮色对比度与筛选栏由本地白金配色规则覆盖（本地没有上游的 `traffic-accounting` 区块）。同日补上 `f6fc04b` 引入、本 fork 漏掉的 `/api/forward` Worker 路由，未知 `/api/*` 改为返回 404。此前 `d706d7e`、`31f7a4b`、`bd651cb`、`f6fc04b` 的转发链网络状况能力也已移植：优先读取 WS `payload.forward`、HTTP 兜底、按服务器/转发链固定位置切换、浅色主题与布局抖动修复、按组切换的每日流量堆叠柱状图。`6221dd1` 的原始上下行趋势、计费口径工具、`traffic_stats_mode` 修正、服务器旗标和动态地区图同样已吸收；与本地九套主题、Ran/Premium 定制大面积冲突的结构性重构不会直接覆盖，而是逐项移植功能，避免界面回退。更早吸收：`8d82a8b` 移除登录；`ce624cf` twemoji 本地化（public/twemoji/ ~3650 个本地 SVG，零外部依赖）；`3ed41ca` Premium 黑金 PRO 主题；`be3d03c`（表格网速列纵向 + ping-pair 单列）经评估与 fork 三视图布局不兼容，跳过；`5ce90c0` 探针表格优化（表格流量列增强）；基线 `2dc05b3`（2026-08-10）。后续本地迭代：ProbeHub 全局连接聚合、流量计费口径 drawer、趋势弹窗三线切换与手机端免滚动撑满、卡片单向计费修正、白金水印等。上游有更新时逐项移植、不整体合并（`src/styles.css`、`src/types.ts`、`src/use-probe.ts`、`src/PremiumProbePage.tsx` 有大量本地定制），流程见 [AGENTS.md](AGENTS.md)：
 
 ```bash
 git fetch official
-git log --oneline 4cf4ae7..official/main
+git log --oneline 989b8e7..official/main
 ```
