@@ -15,6 +15,7 @@ import { LEADERBOARD_ORDER } from './leaderboards'
 import { Leaderboard, formatUptime, monthlyCost } from './Leaderboard'
 import { ProbeHistoryDaysContext } from './use-probe-range'
 import { CYCLE_LABELS as cycleLabel, expiryTimestamp, isPermanent, renewalPriceCny, upcomingExpiries } from './renewal'
+import { isOneTimeTraffic, trafficPeriodText } from './traffic-display'
 import { bytes, expiring, expired, remainingDays, regionFlag, hasLeadingFlag, pct, averagePing, probeRegion } from './server-format'
 import { StaleDataBanner } from './StaleDataBanner'
 import { ForwardOverview, prefetchDeferred, ServerDetail, SystemTrendChart, TrafficDialog, TrendDialog } from './deferred'
@@ -26,12 +27,31 @@ import { PROBE_ALERT_PCT, PROBE_SORT_KEYS, PROBE_SORT_LABELS, connectionTotals, 
 
 // 与主控内置探针同款的地区地球（拱形弧线 + 亮点旁旗帜与台数）
 const RegionGlobe = lazy(() => import('./ProbeRegionGlobe').then((module) => ({ default: module.ProbeRegionGlobe })))
-const PremiumProbePage = lazy(() => import('./PremiumProbePage').then((module) => ({ default: module.PremiumProbePage })))
-const GmApp = lazy(() => import('./glassmorphism/GmApp').then((module) => ({ default: module.default })))
-const EmeraldApp = lazy(() => import('./emerald/EmeraldApp').then((module) => ({ default: module.default })))
-const MiniApp = lazy(() => import('./mini/MiniApp'))
-const LuminaPlusApp = lazy(() => import('./luminaplus/LuminaPlusApp'))
-const NezhaApp = lazy(() => import('./nezha/NezhaApp'))
+const loadPremium = () => import('./PremiumProbePage')
+const loadGlassmorphism = () => import('./glassmorphism/GmApp')
+const loadEmerald = () => import('./emerald/EmeraldApp')
+const loadLite = () => import('./mini/MiniApp')
+const loadLuminaPlus = () => import('./luminaplus/LuminaPlusApp')
+const loadNezha = () => import('./nezha/NezhaApp')
+const PremiumProbePage = lazy(() => loadPremium().then((module) => ({ default: module.PremiumProbePage })))
+const GmApp = lazy(() => loadGlassmorphism().then((module) => ({ default: module.default })))
+const EmeraldApp = lazy(() => loadEmerald().then((module) => ({ default: module.default })))
+const MiniApp = lazy(loadLite)
+const LuminaPlusApp = lazy(loadLuminaPlus)
+const NezhaApp = lazy(loadNezha)
+const THEME_CHUNKS: Record<string, () => Promise<unknown>> = {
+  premium: loadPremium,
+  glassmorphism: loadGlassmorphism,
+  emerald: loadEmerald,
+  lite: loadLite,
+  luminaplus: loadLuminaPlus,
+  nezha: loadNezha,
+}
+
+/** 回访时主题已知，不必等首帧数据到了才开始下载主题包。 */
+export function preloadActiveThemeChunk(): void {
+  THEME_CHUNKS[getActiveTheme()]?.().catch(() => { /* 真正渲染时会再加载一次 */ })
+}
 const MiniServerDetail = lazy(() => import('./mini/MiniServerDetail'))
 
 function RegionSelect({ regions, value, onChange }: { regions: string[]; value: string; onChange: (value: string) => void }) {
@@ -444,7 +464,7 @@ function ServerCardLumina({ server, index }: { server: EnrichedServer; index: nu
                 <strong>{server.traffic_limit ? bytes(Math.max(0, server.traffic_limit - server.traffic_used)) : bytes(server.traffic_used)}</strong>
                 {(() => {
                   // 周期重置倒计时 + 重置日 (主控 period_end, 如 2026-08-31)
-                  if (!server.period_end) return null
+                  if (!server.period_end) return isOneTimeTraffic(server) ? <span className="lumina-quota-reset" title="一次性流量：用完不重置">一次性流量</span> : null
                   const days = Math.ceil((new Date(`${server.period_end}T23:59:59`).getTime() - Date.now()) / 86400000)
                   if (days < 0) return null
                   return <span className="lumina-quota-reset" title={`流量周期 ${server.period_start ?? ''} ~ ${server.period_end}`}>{`重置 ${server.period_end.slice(5)} · 剩 ${days} 天`}</span>
@@ -645,7 +665,7 @@ function ServerCard({ server, index, dense = false }: { server: ProbeServer; ind
             </div>
             <div className="metric-sub">
               <span>{server.traffic_limit ? `${trafficPct.toFixed(0)}%` : '不限量'}</span>
-              {server.period_end && <span>{server.period_end.slice(5, 10).replace('-', '/')} 重置</span>}
+              {server.period_end ? <span>{server.period_end.slice(5, 10).replace('-', '/')} 重置</span> : isOneTimeTraffic(server) && <span>一次性</span>}
             </div>
           </button>
         )}
@@ -858,8 +878,8 @@ function TrafficCell({ server }: { server: ProbeServer }) {
             ↑ {bytes(server.traffic_used_up, false)} · ↓ {bytes(server.traffic_used_down, false)}
           </small>
         )}
-        {server.period_start && server.period_end && (
-          <small className="table-traffic-period">{server.period_start.slice(5)} — {server.period_end.slice(5)}</small>
+        {trafficPeriodText(server) && (
+          <small className="table-traffic-period">{trafficPeriodText(server)}</small>
         )}
         {!!server.traffic_limit && (
           <div className="meter">
@@ -1155,7 +1175,7 @@ export function App() {
   const hasData = !!probe.data
   // 首帧数据渲染完再在空闲时预取图表模块，不和主题包、首帧数据抢带宽
   useEffect(() => { if (hasData) prefetchDeferred() }, [hasData])
-  return <ProbeHistoryDaysContext.Provider value={probe.data?.history_days}><StaleDataBanner error={probe.error} updatedAt={probe.updatedAt} /><ProbeApp {...probe} /></ProbeHistoryDaysContext.Provider>
+  return <ProbeHistoryDaysContext.Provider value={probe.data?.history_days}><StaleDataBanner error={probe.error} updatedAt={probe.updatedAt} fromSnapshot={probe.fromSnapshot} /><ProbeApp {...probe} /></ProbeHistoryDaysContext.Provider>
 }
 
 function ProbeApp({ data, error }: ReturnType<typeof useProbe>) {

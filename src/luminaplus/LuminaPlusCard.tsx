@@ -11,7 +11,7 @@ import { connectionCount } from '../unlocks'
 import { Twemoji } from '../Twemoji'
 import { useNetworkSpeed } from '../use-network-speed'
 import { averageLatency, expiryTime, ratio, validNumber } from '../mini/mini-model'
-import { trafficRuleLabel, trafficUsageLabel } from '../traffic-display'
+import { isOneTimeTraffic, trafficRuleLabel, trafficUsageLabel } from '../traffic-display'
 import { filledSegments, loadMetric, quotaMetric, resetDays, speedTone, combinedSpeedTrail, type LuminaPlusView, type SpeedTrail } from './luminaplus-model'
 import { SpeedPulse } from './SpeedPulse'
 import { LuminaPlusTrafficPopover } from './LuminaPlusTrafficPopover'
@@ -19,6 +19,7 @@ import { trafficWeek } from './luminaplus-traffic'
 import { CYCLE_LABELS, isPermanent } from '../renewal'
 import { SystemTrendChart, TrafficDialog } from '../deferred'
 import { ProbeHistoryDialog } from '../components/ProbeHistoryDialog'
+import { useNearViewport } from '../use-near-viewport'
 
 export const size = (value?: number) => validNumber(value) === undefined ? '—' : bytes(value)
 const percent = (value?: number) => validNumber(value) === undefined ? '—' : `${value!.toFixed(1)}%`
@@ -41,7 +42,9 @@ type TrendKind = 'cpu' | 'mem' | 'disk' | 'traffic'
 const RESOURCE_TREND: Record<string, Exclude<TrendKind, 'traffic'>> = { CPU: 'cpu', 内存: 'mem', 磁盘: 'disk' }
 const TREND_TITLE: Record<Exclude<TrendKind, 'traffic'>, string> = { cpu: 'CPU 使用率历史', mem: '内存使用率历史', disk: '磁盘使用率历史' }
 
-function LuminaPlusCard({ server, index, view, trail }: { server: ProbeServer; index: number; view: LuminaPlusView; trail?: SpeedTrail }) {
+type LuminaPlusCardProps = { server: ProbeServer; index: number; view: LuminaPlusView; trail?: SpeedTrail }
+
+function LuminaPlusCardBody({ server, index, view, trail }: LuminaPlusCardProps) {
   const formatSpeed = useNetworkSpeed()
   const name = server.name || `服务器 ${index + 1}`
   // 点 CPU / 内存 / 磁盘看系统趋势，点流量看原始上下行日流量趋势；负载主控没有历史，不可点
@@ -139,7 +142,7 @@ function LuminaPlusCard({ server, index, view, trail }: { server: ProbeServer; i
       <LuminaPlusConnections server={server} />
     </section>}
     {view !== 'mini' && <div className="lp-quota lp-trend-trigger" {...trendTrigger('traffic', '日流量')} title={`${trafficUsageLabel(server)} · ${trafficRuleLabel(server)} · 点击查看日流量趋势`}>
-      <div className="lp-quota-heading"><span><Database size={14} />{quota.unlimited ? '不限流量' : quota.exceeded ? '额度已超出' : `剩余 ${size(quota.remaining)}`}{reset !== undefined && <small>· {reset === 0 ? '今天重置' : `${reset}天后重置`}</small>}</span>{view === 'compact' ? <span className="lp-quota-age" title="运行时间">{server.online ? '在线' : '离线'}：{age}</span> : <span>{size(quota.used)} / {quota.unlimited ? '不限' : size(quota.limit)}</span>}</div>
+      <div className="lp-quota-heading"><span><Database size={14} />{quota.unlimited ? '不限流量' : quota.exceeded ? '额度已超出' : `剩余 ${size(quota.remaining)}`}{reset !== undefined ? <small>· {reset === 0 ? '今天重置' : `${reset}天后重置`}</small> : isOneTimeTraffic(server) && <small>· 一次性</small>}</span>{view === 'compact' ? <span className="lp-quota-age" title="运行时间">{server.online ? '在线' : '离线'}：{age}</span> : <span>{size(quota.used)} / {quota.unlimited ? '不限' : size(quota.limit)}</span>}</div>
       <div className="lp-quota-meter"><SegmentMeter value={quota.percent} tone={quota.exceeded ? 'danger' : 'traffic'} label="已用计费额度" />{view === 'compact' && <span>{size(quota.used)} / {quota.unlimited ? '不限' : size(quota.limit)}</span>}</div>
     </div>}
     <ConnectionHistory server={server} serverIndex={index} />
@@ -152,6 +155,19 @@ function LuminaPlusCard({ server, index, view, trail }: { server: ProbeServer; i
     </div>}
     {trendDialog}
   </article>
+}
+
+const MemoLuminaPlusCardBody = memo(LuminaPlusCardBody)
+
+/**
+ * 一张卡约 500 个元素，几十台服务器就是几万个：屏幕外的卡片先只放占位（保留名称，页面内搜索还能命中），
+ * 滚动到附近才渲染完整内容。这样首屏和每 3 秒一次的刷新都只计算看得到的卡片。
+ */
+function LuminaPlusCard(props: LuminaPlusCardProps) {
+  const [ref, near] = useNearViewport<HTMLElement>()
+  if (near) return <MemoLuminaPlusCardBody {...props} />
+  const name = props.server.name || `服务器 ${props.index + 1}`
+  return <article ref={ref} className={`${props.view === 'list' ? 'lp-list-row' : 'lp-card'} lp-card-pending`} aria-label={name}><h2>{name}</h2></article>
 }
 
 export default memo(LuminaPlusCard)
