@@ -10,6 +10,7 @@ import { EnrichedServer, getActiveTheme, getDarkOverride, getThemeOverride, setD
 import { Twemoji } from './Twemoji'
 import { PasskeyLogin } from './PasskeyLogin'
 import { CardPingGroups } from './CardPingGroups'
+import { LazyCard } from './LazyCard'
 import { computeRemainingValue, formatMoney } from './value'
 import { LEADERBOARD_ORDER } from './leaderboards'
 import { Leaderboard, formatUptime, monthlyCost } from './Leaderboard'
@@ -22,6 +23,7 @@ import { ForwardOverview, prefetchDeferred, ServerDetail, SystemTrendChart, Traf
 import { Meter, systemTitle, SystemIcon, routeCarrierLabels, goldRoutes, displayReturnRoute, ReturnRouteBadges } from './components/ServerVisuals'
 import { LUMINA_QUOTA_SEGMENTS } from './components/LuminaHealthBars'
 import { ProbeLicenseBar } from './components/ProbeLicenseBar'
+import { ProbeHeaderLicense } from './components/ProbeHeaderLicense'
 import { globeCountryCode, regionGroupLabel } from './globe-regions'
 import { PROBE_ALERT_PCT, PROBE_SORT_KEYS, PROBE_SORT_LABELS, connectionTotals, dailyTrafficTotals, formatCapacity, formatSize, meterTone, networkQuality, kpiColumns, probeHealthIssue, quotaSummary, relativeTime, sortProbeServers, type ProbeHealthIssue, type ProbeSortKey } from './probe-overview'
 
@@ -1496,15 +1498,19 @@ function ProbeApp({ data, error }: ReturnType<typeof useProbe>) {
     ),
   ].filter(Boolean)
   const kpiCols = kpiColumns(kpis.length, kpiWidth)
-  const renderCard = (server: ProbeServer, index: number) => activeTheme === 'lumina'
-    ? <ServerCardLumina key={server.name || index} server={server} index={index} />
-    : <ServerCard key={server.name || index} server={server} index={index} dense={dense} />
+  const renderCard = (server: ProbeServer, index: number) => {
+    const name = server.name || `服务器 ${index + 1}`
+    return activeTheme === 'lumina'
+      ? <LazyCard key={server.name || index} className="server-card lumina-card" name={name} estimatedHeight={648}><ServerCardLumina server={server} index={index} /></LazyCard>
+      : <LazyCard key={server.name || index} className={`server-card probe-card${dense ? ' dense' : ''}`} name={name} estimatedHeight={!server.online ? 136 : dense ? 200 : activeTheme === 'anime' ? 495 : 462}><ServerCard server={server} index={index} dense={dense} /></LazyCard>
+  }
   return (
     <div className='app-shell'>
       <header className="topbar">
         <div>
           {data.logo && <img src={data.logo} alt="" />}
           <h1>{title}</h1>
+          {!isLuminaTheme && <ProbeHeaderLicense badges={data.license_badge} />}
         </div>
         <nav>
           <PasskeyLogin />
